@@ -54,7 +54,7 @@ __3.__
 __(a)__
 
 ```{r echo=FALSE, out.width = '100%'}
-knitr::include_graphics("/Users/Home PC/OneDrive/Introduction_to_Statistical_Learning/ISLR_lab_r/Ex2Q3.png")
+knitr::include_graphics("Path to image file")
 ```
 
 
