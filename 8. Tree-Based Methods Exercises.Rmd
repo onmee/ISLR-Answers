@@ -1,0 +1,480 @@
+---
+title: 'Ch.8 Exercises: Tree Based Methods'
+output:
+  pdf_document: 
+    latex_engine: lualatex
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+__1.__
+
+```{r echo=FALSE, out.width = "100%"}
+knitr::include_graphics("/Users/Home PC/OneDrive/Introduction_to_Statistical_Learning/ISLR_lab_r/Ex8Q1.png")
+```
+
+__2.__ 
+
+  - When using boosting with depth=1, each model consists of a single split created using one distinct variable. So the total number of decision trees(B) is the same as the number of predictors(p); $B=p$ in this case. A new model is fit on the residuals left over from the previous model, and the new model's output is then added to the previous models. Therefore, the final model is additive.
+
+__3.__
+  
+  - $\hat{p}_{mk}$ : Proportion of training observations in the $m^{th}$ region from the $k^{th}$ class.
+  - Therefore, in a setting with two classes (k=2), $\hat{p}_{m1} = 1-\hat{p}_{m2}$.
+  
+  - Classification Error Rate `E` when $1>\hat{p}_{m1}>0.5$(Class 1 is most common class): $E = 1-\hat{p}_{m1}$
+  - `E` when $0<\hat{p}_{m1}<0.5$ (Class 1 is least common class): $E = 1-\hat{p}_{m2} = 1-(1-\hat{p}_{m1})$
+  
+  - Gini index (G) takes a small value when $\hat{p}_{mk}$ is near 0 or 1. 
+  - Gini index in terms of $\hat{p}_{m1}$  is: $G = 2\hat{p}_{m1}(1-\hat{p}_{m1})$.
+  
+  - Cross entropy (D) is: $D = -\hat{p}_{m1}\log\hat{p}_{m1}-(1-\hat{p}_{m1})\log(1-\hat{p}_{m1})$. 
+  
+```{r fig.height=6, fig.width=10}
+# Classification error
+p1 = seq(0,1,0.01)
+E1 = 1-p1[51:101]
+E2 = 1-(1-p1[1:51])
+
+plot(1, type="n", main="Gini Index, Classification Error and Cross-Entropy",
+     xlab=expression(hat(p)[m1]), ylab="Values", xlim=seq(0,1), ylim=c(0, 1))
+points(x=p1[1:51], y = c(E2), type = "l", lwd=2)
+points(x=p1[51:101], y = c(E1), type = "l", lwd=2)
+
+# Gini index
+G = 2*p1*(1-p1)
+lines(p1,G,col="blue",lwd=2)
+
+# Cross Entropy
+D = -p1*log(p1)-(1-p1)*log(1-p1)
+lines(p1,D,col="red",lwd=2)
+
+legend(0.7,0.9,legend=c("Classification Error", "Gini Index", "Cross-Entropy"), 
+       col=c("black", "blue", "red"),lty=c(1,1,1), lwd=c(2,2,2))
+
+```
+
+
+__4.__
+
+__(a)__ __(b)__
+
+
+```{r echo=FALSE, out.width = '100%'}
+knitr::include_graphics("/Users/Home PC/OneDrive/Introduction_to_Statistical_Learning/ISLR_lab_r/Ex8Q4.png")
+```
+
+__5.__
+
+__Majority voting for classification:__
+  
+  - Count of `P(Class is Red | X) < 0.5 = 4` and `P(Class is Red | X) >= 0.5 = 6`. So `X` is classified as red. 
+
+__Average probability:__
+
+  - Average probability that `P(Class is Red | X)` is `4.5/10 = 0.45`. Therefore, `X` is classified as green.
+
+__6.__
+
+  The algorithm grows a very large tree $T_0$ using recursive binary splitting to minimise the RSS. It stops growing when a terminal node has has fewer than some minimum number of observations.$T_0$ due to its size and complexity can overfit the data. As such a tree 'pruning' process is applied to $T_0$ that returns subtrees as a function of $\alpha$ (a positive tuning parameter).Each value of $\alpha$ results in a tree $T$ that is a subset of $T_0$ which minimizes the quantity (8.4).
+  
+  Thereafter, K-fold cross-validation is used to select the best value of $\alpha$, by evaluating the predictions from trees on the test set. The value of $\alpha$ that gives the lowest test MSE is selected.
+  
+  Finally, the best value of $\alpha$ is used to prune `T`. This will return the tree corresponding to that $\alpha$.
+
+#### __Applied__
+
+```{r results='show', message=FALSE, warning=FALSE}
+library(MASS)
+library(randomForest)
+require(caTools)
+library(ISLR)
+library(tree)
+library(tidyr)
+library(glmnet) #Ridge Regression and Lasso
+library(gbm)    #Boosting
+```
+
+__7.__
+
+```{r}
+# Train and test sets with their respective Y responses.
+set.seed(1)
+df = Boston
+sample.data = sample.split(df$medv, SplitRatio = 0.70)
+train.set = subset(df, select=-c(medv), sample.data==T) #Using select to drop medv(Y) column.
+test.set = subset(df, select=-c(medv), sample.data==F)
+train.Y = subset(df$medv, sample.data==T)
+test.Y = subset(df$medv, sample.data==F)
+```
+
+```{r}
+# Four Random Forest models with m = p, p/2, p/3 and p/4, and ntree = 700.
+# Test MSE for smaller trees can be accessed from the random forest object.
+p=13
+rf1 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p, ntree = 700)
+rf2 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/2, ntree = 700)
+rf3 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/3, ntree = 700)
+rf4 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/4, ntree = 700)
+```
+
+```{r fig.height=6, fig.width=10}
+x.axis = seq(1,700,1) 
+plot(x.axis,rf1$test$mse,xlab = "Number of Trees",ylab="Test Error", ylim=c(5,20),type="l",lwd=2)
+lines(x.axis,rf2$test$mse,col="red",lwd=2)
+lines(x.axis,rf3$test$mse,col="blue",lwd=2)
+lines(x.axis,rf4$test$mse,col="green",lwd=2)
+
+legend(600,19,legend=c("m=p", "m=p/2", "m=p/3", "m=p/4"), 
+       col=c("black", "red", "blue", "green"),lty=c(1,1,1), lwd=c(2,2,2))
+
+```
+
+  - The test error decreases rapidly as the number of trees increases.
+  - The test error gets lower as m decreases from m=p upto m=p/3, and thereafter we find no significant changes.
+  
+__8.__ __(a)__ __(b)__
+
+```{r}
+set.seed(2)
+
+df = Carseats
+sample.data = sample.split(df$Sales, SplitRatio = 0.70)
+
+train.set = subset(df, sample.data==T)
+test.set = subset(df, sample.data==F)
+```
+
+```{r fig.height=8, fig.width=12}
+# Regression tree on training set.
+tree.carseats = tree(Sales∼.,data=train.set)
+summary(tree.carseats)
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+
+# Test MSE.
+tree.pred = predict(tree.carseats,test.set)
+test.mse = mean((tree.pred-test.set$Sales)^2)
+test.mse
+```
+ 
+  - Shelve location and Price are the most important predictors, same as with the classification tree.
+  - Test MSE is: __4.98__
+
+__(c)__
+
+```{r}
+set.seed(2)
+cv.carseats = cv.tree(tree.carseats)
+plot(cv.carseats$size,cv.carseats$dev,xlab="Terminal Nodes",ylab="CV Error",type="b")
+```
+  
+  - CV Error is lowest for a tree with 6 terminal nodes. The full tree can now be pruned to obtain the 6 node tree.
+
+```{r}
+prune.carseats = prune.tree(tree.carseats,best=6)
+tree.pred = predict(prune.carseats,test.set)
+test.mse = mean((tree.pred-test.set$Sales)^2)
+test.mse
+```
+  - The test mse is reduced slightly using a pruned tree.
+  
+__(d)__  
+```{r}
+# Bagging
+set.seed(2)
+bag.carseats = randomForest(Sales~.,data=train.set,mtry=10,importance=T)
+importance(bag.carseats)
+bag.yhat = predict(bag.carseats,newdata = test.set)
+mean((bag.yhat-test.set$Sales)^2)
+```
+  - The most important variables are `ShelveLoc` and `Price`, as expected.
+  - The test MSE is __2.33__.Bagging improves the test mse substantially.
+
+__(e)__
+```{r}
+# Random Forests using m/2, sqrt(m), and m/4.
+set.seed(2)
+rf1.carseats = randomForest(Sales~.,data=train.set,mtry=10/2,importance=T)
+rf2.carseats = randomForest(Sales~.,data=train.set,mtry=sqrt(10),importance=T)
+rf3.carseats = randomForest(Sales~.,data=train.set,mtry=10/4,importance=T)
+importance(rf1.carseats)
+importance(rf2.carseats)
+importance(rf3.carseats)
+varImpPlot(rf2.carseats)
+```
+  
+  - In every model, the most important variables are `ShelveLoc` and `Price`.
+  
+```{r}
+rf1.mse = mean((predict(rf1.carseats,newdata = test.set)-test.set$Sales)^2)
+rf2.mse = mean((predict(rf2.carseats,newdata = test.set)-test.set$Sales)^2)
+rf3.mse = mean((predict(rf3.carseats,newdata = test.set)-test.set$Sales)^2)
+
+rf1.mse;rf2.mse;rf3.mse
+```
+  
+  - Test MSE using random forest with m=p/2 is __2.2__,and this is slightly lower than using bagging.
+  
+__9.__
+__(a)__ __(b)__ __(c)__ __(d)__
+
+```{r}
+#dim(OJ)
+set.seed(3)
+
+df = OJ
+sample.data = sample.split(df$Purchase, SplitRatio = 800/1070) #800 observations for the test set.
+train.set = subset(df, sample.data==T)
+test.set = subset(df, sample.data==F)
+```
+
+```{r fig.height=6, fig.width=12}
+tree.OJ = tree(Purchase∼.,data=train.set)
+summary(tree.OJ)
+```
+  
+  - The training error rate is 0.15, and there are 10 terminal nodes. 
+  - The residual mean deviance is high, and so this model doesn't provide a good fit to the training data.
+
+```{r}
+tree.OJ
+```
+
+  - Branch 8 results in a terminal node. The split criterion is `WeekofPurchase < 238.5` and there are 49 observations in this branch, with each observation belonging to MM. Therefore, the final prediction for this branch is `MM`.
+  
+```{r fig.height=6, fig.width=12}
+plot(tree.OJ)
+text(tree.OJ,pretty=0)
+```
+  
+   - `LoyalCH`(Customer brand loyalty for Citrus Hill) is the most important variable. Only five variables out of 18 are used.
+  
+__(e)__
+```{r}
+# Predictions on test set and confusion matrix.
+pred.OJ = predict(tree.OJ, newdata = test.set, type = "class")
+table(pred.OJ,test.set$Purchase)
+```
+  - Test error rate : __0.21__.This is higher than for the training set and is as expected.
+  
+__(f)__ __(g)__ __(h)__
+
+```{r}
+# Cross validation to find optimal tree size.
+set.seed(3)
+cv.OJ = cv.tree(tree.OJ, FUN=prune.misclass)
+cv.OJ
+
+# Plot
+plot(cv.OJ$size, cv.OJ$dev, xlab = "Tree size", ylab = "CV Classification Error", type = "b")
+```
+
+  - Trees with 10 or 8 terminal nodes have the lowest CV Classification Errors.
+
+__(i)__ __(j)__
+
+```{r}
+# Tree with five terminal nodes and training error.
+prune.OJ = prune.misclass(tree.OJ,best=5)
+pred.prune = predict(prune.OJ, newdata = train.set, type = "class")
+table(pred.prune,train.set$Purchase)
+```
+  - Training error rate : 0.16. Slightly higher than using the full tree. 
+
+__(k)__
+
+```{r}
+pred.prune = predict(prune.OJ, newdata = test.set, type = "class")
+table(pred.prune,test.set$Purchase)
+```
+  - Test error rate : 0.207. Pretty much the same as using the full tree, however, we now have a more interpretable tree.
+
+__10.__
+
+__(a)__ __(b)__
+```{r}
+# NA values dropped from Salary, and Log transform.
+Hitters = Hitters %>% drop_na(Salary)
+Hitters$Salary = log(Hitters$Salary) 
+```
+
+```{r}
+# Training and test sets with 200 and 63 observations respectively.
+set.seed(4)
+sample.data = sample.split(Hitters$Salary, SplitRatio = 200/263) 
+train.set = subset(Hitters, sample.data==T)
+test.set = subset(Hitters, sample.data==F)
+```
+
+__(c)__ __(d)__
+
+```{r}
+# Boosting with 1000 trees for a range of lambda values, and computing the training and test mse.
+lambdas = seq(0.0001,0.5,0.01)
+train.mse = rep(NA,length(lambdas))
+test.mse = rep(NA,length(lambdas))
+
+set.seed(4)
+for (i in lambdas){
+  boost.Hitters = gbm(Salary~., data=train.set,distribution = "gaussian", n.trees = 1000, 
+                      interaction.depth = 4, shrinkage = i)
+  yhat.train = predict(boost.Hitters,newdata = train.set, n.trees = 1000)
+  train.mse[which(i==lambdas)] = mean((yhat.train-train.set$Salary)^2)
+  
+  yhat.test = predict(boost.Hitters,newdata = test.set, n.trees = 1000)
+  test.mse[which(i==lambdas)] = mean((yhat.test-test.set$Salary)^2)
+}
+
+```
+
+```{r fig.width=12}
+par(mfrow=c(1,2))
+plot(lambdas,train.mse,type="b",xlab=expression(lambda), ylab="Train MSE")
+plot(lambdas,test.mse,type="b",xlab=expression(lambda), ylab="Test MSE")
+```
+
+```{r}
+# Values of lambdas that give the minimum test and train errors.
+lambdas[which.min(test.mse)];min(test.mse)
+lambdas[which.min(train.mse)];min(train.mse)
+```
+ 
+  - The test MSE is high when lambda is very small, and it also rises as values of lambda gets bigger than 0.01. The minimum test MSE is __0.196__ at $\lambda=0.01$.
+  - The train MSE decreases rapidly as $\lambda$ increases. The minimum training MSE is __8.8e-11__ when $\lambda=0.48$.
+
+__Multiple Linear Regression (Chapter 3)__
+```{r}
+lm.fit = lm(Salary~., data=train.set)
+lm.preds = predict(lm.fit, newdata = test.set)
+lm.mse = mean((test.set$Salary-lm.preds)^2)
+lm.mse
+```
+  
+__Lasso model (Chapter 6)__
+```{r}
+# Matrix of training and test sets, and their respective responses. 
+train = model.matrix(Salary~.,train.set)
+test = model.matrix(Salary~.,test.set)
+y.train = train.set$Salary
+lasso.mod = glmnet(train, y.train, alpha = 1)
+```
+
+
+```{r}
+# Cross validation to select best lambda.
+set.seed(4)
+cv.out=cv.glmnet(train, y.train, alpha=1)
+bestlam=cv.out$lambda.min
+lasso.pred=predict(lasso.mod, s=bestlam, newx = test)
+mean((test.set$Salary-lasso.pred)^2)
+```
+
+  - The test MSE of Multiple Linear Regression and the Lasso is 0.41 and 0.33 respectively.
+  - The test MSE of boosting is 0.20, which is lower than both.
+
+
+__(f)__
+
+```{r}
+# Boosted model using shrinkage value of 0.01 that gave the lowest test MSE.
+boost.best = gbm(Salary~., data=train.set, distribution = "gaussian", n.trees = 1000, 
+                 interaction.depth = 4, shrinkage = 0.01)
+summary(boost.best)
+```
+
+  - CRuns, CAtBat and CHits are the three most important variables.
+
+__(g)__
+
+```{r}
+bag.Hitters = randomForest(Salary~.,train.set,mtry=19,importance=T)
+bag.pred = predict(bag.Hitters,newdata = test.set)
+mean((test.set$Salary-bag.pred)^2)
+```
+  - The test MSE using bagging is 0.191, and this is slightly lower than from boosting.
+
+
+__11.__
+
+__(a)__
+```{r}
+#Creating Purchase01 column and adding 1 if Purchase is "Yes" and 0 if "No". 
+Caravan$Purchase01=rep(NA,5822)
+for (i in 1:5822) if (Caravan$Purchase[i] == "Yes") 
+  (Caravan$Purchase01[i]=1) else (Caravan$Purchase01[i]=0)
+```
+
+```{r}
+# Training set consisting of first 1000 observations, and the test set from the rest.
+train.set = Caravan[1:1000,]
+test.set = Caravan[1001:5822,]
+```
+
+__(b)__
+```{r}
+# Boosting model for classification.
+set.seed(5)
+boost.Caravan = gbm(Purchase01~.-Purchase, data=train.set,distribution = "bernoulli", 
+                    n.trees = 1000, shrinkage = 0.01)
+summary(boost.Caravan)
+```
+  
+  - PPERSAUT and MKOOPKLA appear to be the most important variables.
+
+__(c)__
+
+```{r}
+# Predcited probalbilites on Test Set.
+probs.Caravan = predict(boost.Caravan, newdata = test.set, n.trees = 1000, type="response")
+
+# Predict "Yes" if estimated probability is greater than 20%. 
+preds = rep("No",4822)
+preds[probs.Caravan>0.20]="Yes"
+
+# Confusion matrix
+actual = test.set$Purchase
+table(actual, preds)
+```
+
+  - Overall, the boosted model makes correct predictions for 92.2% of the observations. 
+  
+  - The actual number of "No" is 94% and "Yes" is 6%, and so this is an imbalanced dataset. A model simply predicting "No" on each occasion would have made 94% of the predictions correctly. However, in this case we are more interested in predicting those who go on to purchase the insurance.
+  
+  - The model predicts "Yes" 158 times, and it is correct on 35 of these predictions - so __22.2%__ of those predicted to purchase actually do so. This is much better than random guessing (6%).
+  
+
+__Comparing results with Logistic Regression__
+
+```{r}
+glm.fit = glm(Purchase~.-Purchase01, data = train.set, family = binomial)
+glm.probs = predict(glm.fit, test.set, type="response")
+glm.preds = rep("No",4822)
+glm.preds[glm.probs>0.2]="Yes"
+table(actual,glm.preds)
+```
+
+  - Logistic regression predicts "Yes" 408 times, and it is correct on 58 occasions - so __14.2%__ of those predicted to purchase actually do so. This model is better than random guessing but is worse than the boosted model.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
