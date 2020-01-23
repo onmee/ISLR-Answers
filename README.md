@@ -1,4 +1,4 @@
-# ISLR
+# ISLR Answers
 
 #### Exercise solutions for 'An Introduction to Statistical Learning with Applications in R' (7th Edition).
 
