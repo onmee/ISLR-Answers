@@ -1,0 +1,445 @@
+---
+title: "Ch.5 Exercises: Resampling Methods"
+output:
+  html_document: default
+  pdf_document: 
+    latex_engine: lualatex
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### __Conceptual__
+
+__1.__
+  $$ \alpha = \frac{\sigma^2_Y - \sigma_{XY}}{\sigma^2_X+\sigma^2_Y-2\sigma_{XY}}\qquad (5.6)$$
+  We have: $\sigma^2_X=Var(X)$, $\sigma^2_Y=Var(Y)$, $\sigma_{XY}=COV(XY)$ 
+  
+  Using the following statistical property of variance:
+  
+  $$Var(aX + bY) = a^2Var(X) + b^2Var(Y) + 2abCOV(XY)$$
+  
+  We can show that $\alpha$ minimizes $Var(\alpha X+(1-\alpha)Y)$.
+  
+  $$ \begin{aligned}
+  Var(aX + bY) &= a^2\sigma^2_X + b^2\sigma^2_Y + 2ab\sigma_{XY}\\
+  Var(\alpha X+(1-\alpha)Y) &= \alpha^2\sigma^2_X + (1-\alpha)^2\sigma^2_Y + 2(\alpha(1-\alpha))\sigma_{XY}\\ 
+  f &= \alpha^2\sigma^2_X+\sigma_Y^2-2\alpha\sigma^2_Y + \alpha^2\sigma^2_Y+2\alpha\sigma_{XY}-2\alpha^2\sigma_{XY}
+  \end{aligned} $$
+  
+  Finding the critical points, simplifying and rearranging:
+  $$ \begin{aligned}
+  \frac{\partial(f)}{\partial\alpha} &= 0 \\
+  2\alpha\sigma^2_X - 2\sigma^2_Y + 2\alpha\sigma^2_Y + 2\sigma_{XY} - 4\alpha\sigma_{XY} &= 0\\
+  \alpha &= \frac{\sigma^2_Y - \sigma_{XY}}{\sigma^2_X+\sigma^2_Y-2\sigma_{XY}}
+   \end{aligned} $$
+  
+  
+__2.__ __(a)__
+
+  When using random sampling with replacement to obtain a bootstrap sample from n observations:
+  
+  If n=3, with observations: 1,2,3 we have:
+  
+  Total permutations: $n^n$ = $n^3$ = $27$.
+  Total times an observation will appear in a particular order(say as the first observation): $n^{n-1}$ = $n^2$ = $9$.
+  So, the probability 1st bootstrap observation is the jth observation is: $1/n$.
+  
+  Therefore, the probability the 1st bootstrap observation is not the jth observation is: $1 - 1/n$.
+  
+__(b)__
+  
+  $1 - 1/n$
+
+__(c)__
+
+  Total times an observation will not appear in a bootstrap sample: $(n-1)^n$.
+  
+  Therefore, the probability that an observation is not in the bootstrap sample: $\frac{(n-1)^n}{n^n}$ = $(1-1/n)^n$.
+
+__(d)__
+
+  $p = 1 - (1-1/5)^5 = 0.672$
+
+__(e)__
+
+  $p = 1 - (1-1/100)^{100} = 0.634$
+   
+__(f)__
+
+  $p = 1 - (1-1/10000)^{10000} = 0.632$    
+   
+__(g)__
+
+```{r}
+n = 1:100000
+p = 1-(1-1/n)^n
+plot(n,p, main="Probability (p) vs n observations.")
+```
+
+  - Probability decreases rapidly to an asymptote around 0.63 as n increases.
+
+__(h)__
+
+```{r}
+store=rep(NA, 10000)
+for(i in 1:10000){
+  store[i] = sum(sample(1:100, rep=TRUE)==4)>0
+}
+mean(store)
+```
+  - The result is similar to the value calculated using the formula in 2(e).  
+
+
+__3.__ __(a)__
+
+  In k-fold cross validation, a training set is randomly divided into k groups of equal size. The first group (or fold) is treated as the validation set, and the model is fit on the remaining k-1 groups (training set).The MSE is calculated using the validation set. This procedure is repeated k times and on each occasion the validation set and training sets will be different than the previous one. We then take the average of all the MSE's as the final MSE. 
+
+__(b)__
+
+  i. Less variance in test error estimate. A more accurate test error, as entire dataset is used.
+  
+  ii. Computational advantage, as less computing resources required than LOOCV. If K=10 then only 10 models need to be fitted, unlike with LOOCV where n models need fitting. Higher bias than LOOCV, as fewer observations are used, but tends to have lower variance. A choice of K=5 or 10 gives a test error estimate that has neither high bias or variance, and so tends to give more accurate estimates in general.
+
+__(4)__
+
+  - Create a function that outputs the response Y given X.
+  - Use bootstrapping to make multiple predictions of Y and the associated Standard Error(SE).
+  - Calculate SD by using : $SD = SE\sqrt{n}$
+
+### Applied
+
+__5.__ __(a)__ __(b)__
+```{r}
+library(ISLR)
+library(MASS)
+```
+
+```{r}
+set.seed(1)
+
+require(caTools)
+df = Default
+sample_data = sample.split(df$default, SplitRatio = 0.50)
+training.set = subset(df, sample_data==TRUE) 
+test.set = subset(df, sample_data==FALSE)
+test.default = test.set$default 
+
+# Logistic regression model
+lr.fit = glm(default ~ income+balance, data=training.set, family=binomial)
+
+lr.probs = predict(lr.fit,test.set, type="response")
+lr.preds = rep("No", length(test.set$default)) 
+lr.preds[lr.probs>0.5] = "Yes"
+
+table(lr.preds,test.default)
+```
+  - Test error rate of 2.5%.
+
+__(c)__
+
+```{r}
+# Assuming the question is referring to separate random splits rather than reducing or increasing the validation set.
+set.seed(12)
+
+sample_data = sample.split(df$default, SplitRatio = 0.50)
+training.set = subset(df, sample_data==TRUE) 
+test.set = subset(df, sample_data==FALSE)
+test.default = test.set$default 
+
+# Logistic regression model
+lr.fit = glm(default ~ income+balance, data=training.set, family=binomial)
+
+lr.probs = predict(lr.fit,test.set, type="response")
+lr.preds = rep("No", length(test.set$default)) 
+lr.preds[lr.probs>0.5] = "Yes"
+
+table(lr.preds,test.default)
+```
+
+  - Test error rate of 2.7%
+
+```{r}
+set.seed(123)
+sample_data = sample.split(df$default, SplitRatio = 0.50)
+training.set = subset(df, sample_data==TRUE) 
+test.set = subset(df, sample_data==FALSE)
+test.default = test.set$default 
+
+# Logistic regression model
+lr.fit = glm(default ~ income+balance, data=training.set, family=binomial)
+
+lr.probs = predict(lr.fit,test.set, type="response")
+lr.preds = rep("No", length(test.set$default)) 
+lr.preds[lr.probs>0.5] = "Yes"
+
+table(lr.preds,test.default)
+```
+
+  - Test error rate of 2.4%
+
+```{r}
+set.seed(1234)
+sample_data = sample.split(df$default, SplitRatio = 0.50)
+training.set = subset(df, sample_data==TRUE) 
+test.set = subset(df, sample_data==FALSE)
+test.default = test.set$default 
+
+# Logistic regression model
+lr.fit = glm(default ~ income+balance, data=training.set, family=binomial)
+
+lr.probs = predict(lr.fit,test.set, type="response")
+lr.preds = rep("No", length(test.set$default)) 
+lr.preds[lr.probs>0.5] = "Yes"
+
+table(lr.preds,test.default)
+```
+  - Test error rate of 2.7%
+
+  - The results are similar to each other (low variance). The minor differences can be explained by the fact that we used separate observations for each model.
+
+__(d)__
+
+```{r}
+# Logistic regression model, dummy variable used for student.
+lr.fit = glm(default ~ income+balance+student, data=training.set, family=binomial)
+
+lr.probs = predict(lr.fit,test.set, type="response")
+lr.preds = rep("No", length(test.set$default)) 
+lr.preds[lr.probs>0.5] = "Yes"
+
+contrasts(Default$student)
+table(lr.preds,test.default)
+```
+  - Test error of 2.7%, which is unchanged.
+
+__6.__ __(a)__ __(b)__
+```{r}
+set.seed(111)
+# Logistic regression model
+lr.fit2 = glm(default ~ income+balance, data=df, family=binomial)
+summary(lr.fit2)$coefficients[2:3,2]
+```
+
+```{r}
+boot.fn = function(data, index){
+  default = data$default[index]
+  income = data$income[index]
+  balance = data$balance[index]
+  lr.fit2 = glm(default ~ income + balance, family = binomial)
+  return(summary(lr.fit2)$coefficients[2:3,2])
+}
+```
+
+```{r}
+boot.fn(df,1:length(df$default))
+```
+
+__(c)__
+```{r}
+# Using boot() with R=100.
+library(boot)
+boot(df,boot.fn,100)
+```
+
+__(d)__
+
+  - The standard errors are slightly lower for both income and balance coefficients. In this case, using bootstrapping reduces the standard error for coefficient estimates.
+
+__7.__ __(a)__ __(b)__
+
+```{r}
+set.seed(222)
+lr.fit3 = glm(Direction ~ Lag1+Lag2, data=Weekly, family=binomial)
+summary(lr.fit3)
+```
+__(c)__
+```{r}
+# Logistic regression using all observations except the first.
+lr.fit3 = glm(Direction ~ Lag1+Lag2, data=Weekly[-c(1),], family=binomial)
+
+# Predicting the direction of the first observation.
+lr.probs3 = predict(lr.fit3,Weekly[1,], type="response")
+if(lr.probs3 > 0.5) "Up" else "Down"
+
+```
+  - Prediction is "Up" and this is incorrect.
+
+__(d)__
+
+```{r}
+lr.preds = rep(NA, length(Weekly$Direction))
+lr.err = rep(NA, length(Weekly$Direction))
+for (i in 1:length(Weekly$Direction)){
+  lr.fit=glm(Direction ~ Lag1+Lag2, data=Weekly[-c(i),], family=binomial)
+  lr.probs = predict(lr.fit,Weekly[i,], type="response")
+  #Make predictions for row i (left out of training set) and compare to actual prediction, then use if else statement to state 1 if incorrect and 0 if correct.
+  
+  if(lr.probs > 0.5) lr.preds[i]="Up" else lr.preds[i]="Down"
+  if(lr.preds[i]==Weekly$Direction[i]) lr.err[i]=0 else lr.err[i]=1
+  }
+
+```
+
+__(e)__
+
+Count of 1's divided by n:
+```{r}
+#LOOCV Error rate
+cv.err = sum(lr.err==1)/length(Weekly$Direction)
+print(cv.err)
+table(Weekly$Direction)
+```
+  - LOOCV error rate is 44.9%. This shows that the model is correct in 55% of its predictions, which is slightly better than random guessing.
+
+
+#### __Applied__
+
+__8.__ __(a)__
+
+```{r}
+set.seed(1)
+x=rnorm(100)
+y=x-2*x^2+rnorm(100)
+```
+
+  - $n=100$, $p=2$, $Y = X-2X^2+e$
+__(b)__
+```{r}
+plot(x,y)
+```
+
+  - The dataset is non-linear and the relationship between X and Y is roughly quadratic.
+
+  
+__(c)__
+
+```{r}
+set.seed(11)
+x = c(rnorm(100))
+y = c(x-2*x^2+rnorm(100))
+df = data.frame(x,y)
+cv.err = rep(0,4)
+
+for (i in 1:4){
+  lr.fit = glm(y~poly(x,degree=i,raw=TRUE))
+  cv.err[i] = cv.glm(df, lr.fit)$delta[1]
+}
+cv.err
+```
+  - As expected, there is a sharp drop in LOOCV estimate for MSE when a quadratic term is added. The error increases as higher polynomial terms are used, again confirming the quadratic nature of the dataset.
+  
+__(d)__
+```{r}
+set.seed(123)
+x = c(rnorm(100))
+y = c(x-2*x^2+rnorm(100))
+plot(x,y)
+df = data.frame(x,y)
+cv.err = rep(0,4)#
+for (i in 1:4){
+  lr.fit = glm(y~poly(x,degree=i,raw=TRUE))
+  cv.err[i] = cv.glm(df, lr.fit)$delta[1]
+}
+cv.err
+
+```
+ 
+  - The results are similar to (c). As can be seen from the chart, the dataset is similar to before, and so the lowest error is given by the model with a quadratic term.
+
+__(e)__
+
+  - The model with the quadratic term had the lowest LOOCV error. This is expected as the the dataset is roughly quadratic in shape - as show in (b).
+  
+__(f)__
+
+```{r}
+summary(glm(y~poly(x,degree=1,raw=TRUE)))
+summary(glm(y~poly(x,degree=2,raw=TRUE)))
+summary(glm(y~poly(x,degree=4,raw=TRUE)))
+```
+
+
+  - Model (ii): Degree=1 and 2 coefficients are statistically significant. This is expected and matches the CV results, where this model (with predictors $X$ and $X^2$) provides the lowest test error.
+  - Model (iv): Degree=1 and 2 coefficients are statistically significant. This matches model (ii).
+
+
+__(9)__ __(a)__ __(b)__
+
+```{r}
+# Mean of medv
+mu = mean(Boston$medv)
+
+# Standard deviation of mean
+length = length(Boston$medv)
+sd = sqrt(sum((Boston$medv - mu)^2)/(length-1))
+
+# Standard error of mean
+se = sd/sqrt(length)
+se
+```
+__(c)__
+
+```{r}
+# Standard error using bootstrapping
+boot.fn2 = function(data, index){
+  X=data$medv[index]
+  mu2 = mean(X)
+  return(mu2)
+}
+```
+```{r}
+set.seed(1)
+boot(Boston,boot.fn2,1000)
+```
+
+  - The standard error using bootstrapping with R=1000 is 0.41, which is almost the same as in (c).
+
+__(d)__
+
+```{r}
+mu-2*se #lower bound
+mu+2*se #higher bound
+```
+
+
+```{r}
+t.test(Boston$medv)
+```
+  - The confidence intervals nearly the same when using the approximation formula or using one sample t-test.
+  
+__(e)__ __(f)__
+
+```{r}
+# Median value of medv
+median.medv = median(Boston$medv)
+
+# Bootstrap estimate of the standard error of the median value.
+boot.fn3 = function(data, index){
+  X=data$medv[index]
+  Y = median(X)
+  return(Y)
+}
+
+boot(Boston,boot.fn3,1000)
+```
+
+  - SE(median) = 0.37, which is relatively small when compared to the median value of 21.2. So we can be reasonably confident of the estimate.
+  
+__(g)__
+```{r}
+tenth.percentile = quantile(Boston$medv, 0.1)
+
+boot.fn4 = function(data, index){
+  X=data$medv[index]
+  Y = quantile(X, 0.1)
+  return(Y)
+}
+
+boot(Boston,boot.fn4,1000)
+
+```
+
+  - The standard error 0.499, which is relatively low when compared to the 10th percentile value of 12.75.
