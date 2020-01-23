@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 __1.__
 
 ```{r echo=FALSE, out.width = "100%"}
-knitr::include_graphics("/Users/Home PC/OneDrive/Introduction_to_Statistical_Learning/ISLR_lab_r/Ex8Q1.png")
+knitr::include_graphics("Path to your image file")
 ```
 
 __2.__ 
@@ -65,7 +65,7 @@ __(a)__ __(b)__
 
 
 ```{r echo=FALSE, out.width = '100%'}
-knitr::include_graphics("/Users/Home PC/OneDrive/Introduction_to_Statistical_Learning/ISLR_lab_r/Ex8Q4.png")
+knitr::include_graphics("Path to your image file")
 ```
 
 __5.__
