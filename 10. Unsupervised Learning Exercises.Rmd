@@ -1,0 +1,579 @@
+---
+title: 'Ch.10 Exercises: Unsupervised Learning'
+output:
+  pdf_document: 
+    latex_engine: lualatex
+  html_document: default
+---
+
+```{r}
+library(e1071)
+library(ISLR)
+require(caTools)
+require(plotrix)
+
+library(tidyr)
+library(knitr)
+```
+
+#### __Conceptual__
+
+__1.__
+__(a)__
+
+We have the following equation:
+$$\frac{1}{|C_k|} \sum _{i, i^{’} \in C_k} \sum _{j=1}^{p} (x _{ij} - x _{i^{’}j})^2 = 2\sum _{i \in C_k} \sum _{j=1}^{p} (x _{ij} - \bar{x} _{kj})^2 \tag{10.12}$$
+
+Where, $\bar{x} _{kj} = \frac{1}{|C_k|} \sum _{i \in C_k} x _{ij}$ is the mean for feature $j$ in cluster $C_k$.
+
+Expanding the LHS over i:
+
+$$ 
+\frac{1}{|C_k|}\sum_{i,i' \in C_k}\sum_{j=1}^p (x_{ij}-x_{i'j})^2 = 
+    \frac{1}{|C_k|}\sum_{i' \in C_k}\sum_{j=1}^p (x_{1j}-x_{i'j})^2 + 
+    \frac{1}{|C_k|}\sum_{i' \in C_k}\sum_{j=1}^p (x_{2j}-x_{i'j})^2 + ...
+$$
+
+
+
+Further expanding a single term from the summation:
+
+
+$$
+\begin{aligned}
+\frac{1}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p (x_{ij}-x_{i'j})^2 
+   &= \frac{1}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p ((x_{ij}-\bar{x}_j)-(x_{i'j}-\bar{x_j}))^2 \\
+   &=\frac{1}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p ((x_{ij}-\bar{x}_j)^2-2(x_{ij}-\bar{x}_j)(x_{i'j}-\bar{x_j})+(x_{i'j}-\bar{x_j})^2) \\
+   &=\frac{1}{|C_k|}\sum_{i \in C_k}\sum_{j=1}^p (x_{ij}-\bar{x}_j)^2
+      -\frac{2}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p(x_{ij}-\bar{x}_j)(x_{i'j}-\bar{x_j}) 
+      +\frac{1}{|C_k|}\sum_{i' \in C_k}\sum_{j=1}^p(x_{i'j}-\bar{x_j})^2 \\
+   &=\frac{2}{|C_k|}\sum_{i \in C_k}\sum_{j=1}^p (x_{ij}-\bar{x}_j)^2
+-\frac{2}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p(x_{ij}-\bar{x}_j)(x_{i'j}-\bar{x_j})
+\end{aligned}
+$$
+
+Substituting the final term from above in the summation:
+
+$$ 
+2\frac{|C_k|}{|C_k|}\sum_{i \in C_k}\sum_{j=1}^p (x_{ij}-\bar{x}_j)^2
+\underbrace{-\frac{2}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p(x_{1j}-\bar{x}_j)(x_{i'j}-\bar{x_j})
+-\frac{2}{|C_k|}\sum_{i' \in C_k,i'\neq i}\sum_{j=1}^p(x_{2j}-\bar{x}_j)(x_{i'j}-\bar{x_j})+...}_{\text{This term is equal to zero because}\sum_{i' \in C_k}x_{i'j}-|C_k| \bar{x_j}=0}
+$$
+
+The remaining term is:
+
+$$
+\begin{aligned}
+2\frac{|C_k|}{|C_k|}\sum_{i \in C_k}\sum_{j=1}^p (x_{ij}-\bar{x}_j)^2
+\qquad\text{Proving 10.12}
+\end{aligned}
+$$
+__(b)__
+
+  - At end of each iteration the K-Means algorithm assigns the observations to the closest (Euclidean distance) centroid. Minimising the RHS of the identity will reduce the euclidean distance and so the LHS (10.11) will also be reduced. In other words the identity shows that minimizing the sum of the squared Euclidean distance for each cluster is the same as minimizing the within-cluster variance for each cluster.
+  
+
+__2.__
+__(a)__
+
+Using algorithm 10.2 and complete linkage (maximal intercluster dissmilarity) will result in the following dendogram:
+
+Initial dissmilarity matrix:
+$$\begin{bmatrix}
+          & 0.3 & 0.4 & 0.7 \\
+    0.3   &     & 0.5 & 0.8 \\
+    0.4   & 0.5 &     & 0.45 \\
+    0.7   & 0.8 & 0.45 
+\end{bmatrix}
+$$
+
+
+Treating each observation as its own cluster and fusing those most similar, will result in clusters 1 and 2 being fused at height 0.3 and giving us the following matrix:
+
+$$\begin{bmatrix}
+      &     & 0.5 & 0.8 \\
+      & 0.5 &     & 0.45 \\
+      & 0.8 & 0.45 
+\end{bmatrix}
+$$
+As before, cluster 3 and 4 will be fused at 0.45, leaving the highest dissmilarity value of 0.8 at which both clusters (1 & 2) and (3 & 4) will be fused.
+
+$$\begin{bmatrix}
+    &  & 0.8 \\
+    &0.8  
+\end{bmatrix}
+$$
+
+
+Dendogram sketch:
+
+```{r}
+m = as.dist(matrix(c(0, 0.3, 0.4, 0.7, 
+                     0.3, 0, 0.5, 0.8,
+                     0.4, 0.5, 0.0, 0.45,
+                     0.7, 0.8, 0.45, 0.0), nrow = 4))
+plot(hclust(m, method = "complete"))
+
+```
+
+__(b)__
+
+Repeating (a) with single linkage (minimal intercluster dissmilarity)
+
+Like in (a), cluster 1 and 2 are the most similar and are fused at height 0.3. After this first fusion we are left with the matrix below:
+
+$$\begin{bmatrix}
+      &     & 0.4 & 0.7 \\
+      & 0.4 &     & 0.45 \\
+      & 0.7 & 0.45 
+\end{bmatrix}
+$$
+The lowest dissimilarity value is 0.4, between cluster (1 & 2) and 3, so we fuse them together. Leaving us the following matrix:
+$$\begin{bmatrix}
+    &  & 0.45 \\
+    &0.45  
+\end{bmatrix}
+$$
+
+Finally we are left with 0.45 at which the cluster ((1, 2) & 3) will be fused with 4.
+
+
+
+```{r}
+m = as.dist(matrix(c(0, 0.3, 0.4, 0.7, 
+                     0.3, 0, 0.5, 0.8,
+                     0.4, 0.5, 0.0, 0.45,
+                     0.7, 0.8, 0.45, 0.0), nrow = 4))
+plot(hclust(m, method = "single"))
+
+```
+
+__(c)__
+
+ - (1,2) & (3,4)
+
+__(d)__
+
+  - ((1,2),3) & 4
+  
+__(e)__
+
+
+```{r}
+plot(hclust(m, method = "complete"), labels = c(2,1,4,3))
+
+```
+
+__3.__
+__(a)__
+
+```{r}
+df = data.frame(x1 = c(1, 1, 0, 5, 6, 4), x2 = c(4, 3, 4, 1, 2, 0))
+colnames(df)=c('X1','X2')
+plot(df, pch = 19, col = "black")
+
+```
+
+__(b)__ 
+```{r}
+set.seed(3)
+
+# Assigning observations randomly to two clusters
+cluster = sample(2, nrow(df), replace=T)
+
+# Table of assigned clusters
+cbind(df,cluster)
+
+```
+
+__(c)__
+
+The cluster centroids are simply the mean of the observations assigned to each cluster.
+
+So for cluster 1, we can calculate it as follows:
+ $$ \overline{x}_{11} = \frac{1}{2}(1 + 5) = 3 \quad and \quad \overline{x}_{12} = \frac{1}{2}(4 + 1) = 2.5 $$
+And for cluster 2: 
+ $$ \overline{x}_{21} = \frac{1}{4}(1 + 0 + 6 + 4) =  2.75\quad and \quad \overline{x}_{22} = \frac{1}{4}(3 + 4 + 2 + 0) = 2.25 $$
+
+```{r}
+
+# Computing centroids and plotting them alongside the clusters
+c1 = c(mean(df[cluster==1, 1]), mean(df[cluster==1, 2])) #Centroid 1
+c2 = c(mean(df[cluster==2, 1]), mean(df[cluster==2, 2])) #Centroid 2
+
+plot(df, pch = 19, col = (cluster+1))
+points(c1[1], c1[2], col="red", pch=4)
+points(c2[1], c2[2], col="green", pch=4)
+```
+
+__(d)__
+
+```{r}
+# Function to calculate the euclidean distance between two points
+euclidean = function(a, b) {
+  (sqrt((a[1] - b[1])^2 + (a[2]-b[2])^2))
+}
+
+
+# Function that loops over all observations and assigns them to the closest centroid, by calling the euclidean function
+new_labels = function(df, c1, c2) {
+  labels = rep(NA, nrow(df))
+  for (i in 1:nrow(df)) {
+    if (euclidean(df[i,], c1) < euclidean(df[i,], c2)) {
+      labels[i] = 1
+    } else {
+      labels[i] = 2
+    }
+  }
+  return(labels)
+}
+
+```
+
+```{r}
+#Assigning observations to their closest centroids
+new_cluster = new_labels(df, c1, c2)
+
+#Table of original and new clusters
+cbind(df,cluster,new_cluster)
+
+```
+
+
+__(e)__ __(f)__
+
+```{r}
+#Running the new labels function until the assigned clusters stop changing.
+final_cluster = rep(-1, 6)
+while (!all(final_cluster == cluster)) {
+  final_cluster = cluster
+  c1 = c(mean(df[cluster==1, 1]), mean(df[cluster==1, 2]))
+  c2 = c(mean(df[cluster==2, 1]), mean(df[cluster==2, 2]))
+  cluster = new_labels(df, c1, c2)
+}
+
+#Plot of the final cluster assigments
+plot(df, pch = 19, col = (cluster+1))
+points(c1[1], c1[2], col="red", pch=4)
+points(c2[1], c2[2], col="green", pch=4)
+```
+
+__4.__
+__(a)__
+
+Not enough information to tell. 
+
+Since complete linkage uses the highest inter-cluster dissimilarity and single linkage uses the lowest, in most of the cases the fusion with complete linkage will occur higher on the tree. 
+
+For example, if d(1,4)=2, d(1,5)=3, d(2,4)=1, d(2,5)=3, d(3,4)=4 and d(3,5)=1, the single linkage dissimilarity between {1,2,3} and {4,5} would be equal to 1 and the complete linkage dissimilarity between {1,2,3} and {4,5} would be equal to 4. So, with single linkage, they would fuse at a height of 1, and with complete linkage, they would fuse at a height of 4.
+
+In some special cases (when the inter-cluster distances are all the same) the fusion will occur at the same height for both linkage methods.
+
+For example, if all inter-cluster distances are equal to 2, we would have that the single and complete linkage dissimilarities between {1,2,3} and {4,5} are equal to 2.
+
+__(b)__
+
+They would fuse at the same height because linkage type does not affect leaf-to-leaf fusion. For example, if d(5,6)=2, the single and complete linkage dissimilarities between {5} and {6} would be equal to 2. So, they would fuse at a height of 2 for single and complete linkage.
+
+__5.__
+
+
+ - For the figure on the left, we have unscaled variables and the number of socks will have the biggest impact on the resulting clusters. The observations would likely be split betweeen a cluster with customers purchasing 'most socks and computer', and 'least socks and computer'.
+ 
+ 
+ - For the central figure, the variables have been scaled, and so the number of computers will have a much bigger impact than before. We would likely have clusters split between the number of computers purchased.
+ 
+ 
+ - For the figure on the right, the price of computers has an overwhelmingly large impact. The clusters will be split between 'purchsed computer', and 'no computer purchased'.
+ 
+__6.__
+
+__(a)__
+
+  - PCA finds, in the data space, the dimension (or direction) with the largest variance out of the overall variance. This is our first principal component, which explains 10% of the total variance in this data set. Then it would find the dimension with the second largest variance (second principal component), orthogonal to the first one, out of the remaining 90% variance and so on. 
+  
+  - Another way of looking at it is that 90% of the variance in the data is not contained in the first principal component, and other components are required to explain more of the variance. in a situation where there exist a whole bunch of independent variables, PCA helps you figure out which linear combinations of these variables matter the most. Ideally, we would want a few principle components that explain most of the variability in the data set.  
+  
+__(b)__
+
+  - Given the flaw shown in pre-analysis of a time-wise linear trend amongst the tissue samples’ first principal component, I would advise the researcher to include the machine used (A vs B) as a feature of the data set. This should enhance the PVE of the first principal component before applying the two-sample t-test.
+  
+  - The use of machine A during earlier and then B at later times respectively, could have been responsible for a time-wise linear trend amongst the tissue samples first principle component. As such I would advise the researcher to include the machine used (A vs B) as a new feature for the data set. This should enhance the PVE (proportion of variance explained) for the first principle component, before appling the two-sample t-test. 
+  
+
+__(c)__
+
+A toy data set to show that adding a feature for the machine (A vs B) used, improves the PVE for the first priciple component. This is a very basic simulation, so don't take the results for granted. 
+
+```{r}
+set.seed(101)
+
+Control = matrix(rnorm(50 * 1000), ncol = 50)
+Treatment = matrix(rnorm(50 * 1000), ncol = 50)
+
+X = cbind(Control, Treatment)
+X[1, ] = seq(-18, 18 - .36, .36) # linear trend in one dimension
+pr.out = prcomp(scale(X))
+summary(pr.out)$importance[, 1]
+
+```
+
+
+  - From the summary, we can observe that 10.08% of the variance is explained by the first principle component.
+
+
+Adding in machine used (A vs B) using 10 vs 0 encoding.
+
+```{r}
+set.seed(101)
+
+X = rbind(X, c(rep(10, 50), rep(0, 50)))
+pr.out = prcomp(scale(X))
+summary(pr.out)$importance[, 1]
+
+```
+
+  - We can see the PVE explained increased to 11.7% after adding in a feature for the machine used.
+  
+
+#### __Applied__
+
+__7.__
+
+As per the HINT, using 'cor' and 'dist' functions to calculate the correlation and distance of the USArrest observations.
+
+```{r}
+
+scaledArrests = scale(USArrests)
+
+corr_dis = as.dist(1-cor(t(scaledArrests))) #correlation based distance
+euclidean_dis = dist(scaledArrests)^2 #squared euclidean distance
+
+summary(corr_dis/euclidean_dis)
+```
+
+If the quantities are approximately proportional then $euclidean\_dis≈K⋅corr\_dis$ for a constant K.
+
+
+```{r}
+summary(corr_dis-0.1339*euclidean_dis)
+```
+
+If $K = 0.1339$ then they are approximately equal, with a mean difference of around 0.05 only.
+
+__8.__
+__(a)__
+
+```{r}
+pr.out = prcomp(scaledArrests)
+pr.var = pr.out$sdev^2
+
+pve = pr.var/sum(pr.var)
+pve
+
+```
+
+  - PVE calculated using the prcomp() function. As expected, the first principal component explains 62% of the variance in this dataset.
+  
+__(b)__
+```{r}
+loadings = pr.out$rotation #principle component loadings
+
+num = apply((as.matrix(scaledArrests) %*% loadings)^2, 2, sum) #Summation of squares of scorings (numerator in the formula)
+denom = sum(apply(as.matrix(scaledArrests)^2, 2, sum)) #Variability in the data (denominator in the formula)
+
+pve2 = num/denom
+pve2
+
+```
+
+  - As expected, the resulting PVE's are exactly the same as when using prcomp().
+  
+
+__9.__
+__(a)__
+
+```{r}
+set.seed(1)
+
+hc.complete = hclust(dist(USArrests), method = 'complete')
+plot(hc.complete, cex = 0.7)
+```
+
+
+__(b)__
+
+```{r}
+hc.cut = cutree(hc.complete, k=3) #Cutting tree with K=3, so we get 3 clusters.
+
+tibble(
+  states = rownames(USArrests),
+  cluster = hc.cut
+)
+
+```
+
+__(c)__
+
+```{r}
+# As I have already scaled the US Arrests dataset, I'm simply going to use the existing variable 'scaledArrests'
+
+hc.complete.scaled = hclust(dist(scaledArrests), method = 'complete')
+plot(hc.complete.scaled, cex = 0.7)
+
+```
+
+
+__(d)__
+
+  - The scaled dendogram has greatly reduced height, and the clusters obtained are somewhat different. However, the bushiness of the tree doesn't appear to be affected.
+  
+  - As a general rule, variables with different measurement units should be scaled before computing the inter-obersvation dissimilarities. Which applies to this dataset.
+
+
+__10.__
+
+__(a)__
+
+```{r}
+set.seed(1)
+# Simulated data with mean shift to create three distinct classes. 
+# Increasing the difference in means for each class would create greater separation between the classes. I've opted for values that show the classes are well separated, with little overlap between the observations.
+simulated.data = matrix(c(rnorm(20 * 50, mean = 1),               
+             rnorm(20 * 50, mean = 2),
+             rnorm(20 * 50, mean = 3)), ncol = 50, byrow = TRUE)
+
+class = unlist(lapply(1:3,function(x){rep(x,20)}))
+```
+
+__(b)__
+
+```{r}
+pr.out2 = prcomp(simulated.data)
+plot(pr.out2$x[,1:2],col=class)
+```
+
+
+__(c)__
+
+```{r}
+kmeans.out = kmeans(simulated.data, 3, nstart = 60)
+table(class, kmeans.out$cluster)
+
+```
+
+  - All observations are correctly classified. This is expected as the observations in the three classes are well separated. 
+
+
+
+__(d)__
+```{r}
+kmeans.out = kmeans(simulated.data, 2, nstart = 60)
+table(kmeans.out$cluster)
+
+```
+
+  - The observations are now assigned to two classes. One class is assigned much more of the observations than the other. A plot of the newly assigned cluster is shown below.
+  
+```{r}
+plot(pr.out2$x[,1:2],col=kmeans.out$cluster)
+```
+
+__(e)__
+
+```{r}
+kmeans.out = kmeans(simulated.data, 4, nstart = 60)
+table(kmeans.out$cluster)
+
+```
+
+  - We already know that there are three distinct classes, and so when using K = 4, we could see observations being assigned into more classes or clusters than is necessary (or is supported by the dataset). That is what has happened in this case. In other words, when using 4 clusters it becomes more difficult to determine the difference between the new found clusters and the actual class values.
+  
+  - The plot below shows the newly assigned clusters.
+  
+```{r}
+plot(pr.out2$x[,1:2],col=kmeans.out$cluster)
+```
+  
+__(f)__
+
+```{r}
+kmeans.out = kmeans(pr.out2$x[,1:2], 3, nstart = 60)
+
+table(kmeans.out$cluster)
+table(class)
+
+```
+
+  - As expected, and like in part (c), the clusters obtained have a perfect mapping to the original classes.
+
+
+__(g)__
+
+```{r}
+set.seed(1)
+kmeans.out = kmeans(scale(simulated.data), 3, nstart = 60)
+table(kmeans.out$cluster)
+table(class)
+
+```
+
+
+```{r}
+plot(pr.out2$x[,1:2],col=kmeans.out$cluster)
+```
+  
+  - The results are exactly like in part (b), where the assigned clusters are perfectly mapped to the original classes. Likely because the simulated data set I created was very well separated. Datasets with overlapping observations would likely result in a different outcome.
+
+
+__11.__
+__(a)__
+
+```{r}
+set.seed(1)
+gene.data = read.csv("Ch10Ex11.csv", header = F)
+```
+__(b)__
+
+```{r}
+# Using complete linkage and correlation based distance
+
+corr.dis = as.dist(1 - cor(gene.data))
+hc.complete = hclust(corr.dis, method = "complete")
+plot(hc.complete)
+```
+
+```{r}
+# Using single linkage and correlation based distance
+
+hc.single = hclust(corr.dis, method = "single")
+plot(hc.single)
+```
+
+```{r}
+# Using average linkage and correlation based distance
+
+hc.average = hclust(corr.dis, method = "average")
+plot(hc.average)
+```
+
+  - The resulting trees are quite different, and so are impacted by the type of linkage. Single linkage results in a very unbalanced tree and average has three clusters, whereas complete gives the most balanced tree where the samples are split into two roughly 50/5 groups. As we already know that samples are equally split between healthy and diseased groups, complete linkage will likely give the best results.
+
+__(c)__
+
+  - We could use PCA to see which genes differ the most between the healthy and diseased group. We will examine the absolute values of the total loadings for each gene as it characterizes the weight of each gene.
+  
+```{r}
+pr.gene = prcomp(t(gene.data))
+summary(pr.gene)
+```
+
+```{r}
+
+total.load = apply(pr.gene$rotation, 1, sum)
+index = order(abs(total.load), decreasing = TRUE)
+index[1:10]
+
+```
+
+  - These are the 10 genes that differ most across the two groups.
