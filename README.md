@@ -4,7 +4,7 @@
 
 Online course available from: http://statlearning.class.stanford.edu/.
 
-Link to solutions: https://onmee.github.io/ISLR-Solutions/
+Complete R Markdown files with the code and answers are shown above. Additionally, here is the link to PDF outputs: https://onmee.github.io/ISLR-Solutions/
 
 RStudio is a great IDE for R, and would be my recommendation for this course.
 
