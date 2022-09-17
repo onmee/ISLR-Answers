@@ -1,6 +1,6 @@
 # ISLR Solutions
 
-#### Exercise solutions for 'An Introduction to Statistical Learning with Applications in R' (7th Edition).
+#### Exercise solutions in R for 'An Introduction to Statistical Learning with Applications in R' (1st Edition).
 
 Online course available from: http://statlearning.class.stanford.edu/.
 
