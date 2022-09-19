@@ -2,7 +2,7 @@
 
 #### Exercise solutions in R for 'An Introduction to Statistical Learning with Applications in R' (1st Edition).
 
-Online course available from: http://statlearning.class.stanford.edu/.
+Online course available from: https://online.stanford.edu/courses/sohs-ystatslearning-statistical-learning.
 
 Complete R Markdown files with the code and answers are shown above. Additionally, here is the link to PDF outputs: https://onmee.github.io/ISLR-Solutions/
 
